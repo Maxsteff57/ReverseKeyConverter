@@ -50,10 +50,31 @@ def transform_line(line):
     return _HEX_RUN_RE.sub(_reverse_hex_run, stripped)
 
 
-def process_content(text):
-    """Process multi-line text and return transformed text."""
+def extract_hex_only(line):
+    """
+    Return only the hex-byte runs from *line*, stripping all non-hex text
+    (prefixes, suffixes, separators).  Runs are joined with a single space.
+    If the line has no hex content, return an empty string.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return ''
+    runs = _HEX_RUN_RE.findall(stripped)
+    return ' '.join(runs) if runs else ''
+
+
+def process_content(text, strip_extra=False):
+    """Process multi-line text and return transformed text.
+    If *strip_extra* is True, remove everything except hex-byte chains.
+    """
     lines = text.splitlines()
-    return '\n'.join(transform_line(line) for line in lines)
+    result = []
+    for line in lines:
+        converted = transform_line(line)
+        if strip_extra:
+            converted = extract_hex_only(converted)
+        result.append(converted)
+    return '\n'.join(result)
 
 
 def is_line_valid(line):
@@ -90,6 +111,7 @@ class ReverseKeyConverterApp:
 
         self.current_file_path = tk.StringVar()
         self.output_file_path = tk.StringVar()
+        self.strip_mode = tk.BooleanVar(value=False)
 
         self._build_ui()
 
@@ -133,6 +155,11 @@ class ReverseKeyConverterApp:
         ttk.Button(btn_frame, text="Очистить (Ctrl+D)", command=self._clear_all).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Копировать результат", command=self._copy_result).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Вставить (Ctrl+V)", command=self._paste_to_reverse).pack(side=tk.LEFT, padx=5)
+        ttk.Checkbutton(
+            btn_frame, text="Только hex-байты",
+            variable=self.strip_mode,
+            command=self._auto_convert,
+        ).pack(side=tk.LEFT, padx=10)
         ttk.Button(btn_frame, text="Сохранить (Ctrl+S) 💾", command=self._start_conversion).pack(side=tk.RIGHT, padx=5)
 
         # --- Text areas ---
@@ -219,7 +246,8 @@ class ReverseKeyConverterApp:
         reverse_content = self.reverse_text.get('1.0', tk.END)
         self.true_text.delete('1.0', tk.END)
         if reverse_content.strip():
-            self.true_text.insert('1.0', process_content(reverse_content))
+            self.true_text.insert('1.0', process_content(
+                reverse_content, strip_extra=self.strip_mode.get()))
         self._validate_and_highlight()
 
     def _validate_and_highlight(self):

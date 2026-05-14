@@ -10,7 +10,7 @@ import sys
 import unittest
 
 sys.path.insert(0, '.')
-from reverse_key_converter import transform_line, is_line_valid, process_content
+from reverse_key_converter import transform_line, is_line_valid, process_content, extract_hex_only
 
 
 class TestTransformLine(unittest.TestCase):
@@ -226,6 +226,84 @@ class TestProcessContent(unittest.TestCase):
             "5F 8A 40 83, 5F 8A 40 83"
         )
         self.assertEqual(process_content(inp), expected)
+
+
+class TestExtractHexOnly(unittest.TestCase):
+    """Tests for extract_hex_only(): stripping non-hex text."""
+
+    def test_empty_line(self):
+        self.assertEqual(extract_hex_only(""), "")
+
+    def test_whitespace_only(self):
+        self.assertEqual(extract_hex_only("   "), "")
+
+    def test_no_hex(self):
+        self.assertEqual(extract_hex_only("Some random text"), "")
+
+    def test_plain_hex(self):
+        self.assertEqual(
+            extract_hex_only("F8 BB 1E BE AE D7 E9 A8"),
+            "F8 BB 1E BE AE D7 E9 A8",
+        )
+
+    def test_prefix_colon_stripped(self):
+        # "01" and "3B" are valid hex tokens — they are kept
+        self.assertEqual(
+            extract_hex_only("01 Key 3B: F8 BB 1E BE Current"),
+            "01 3B F8 BB 1E BE",
+        )
+
+    def test_underscore_prefix_stripped(self):
+        self.assertEqual(
+            extract_hex_only("07_56    D2 5D 86 42 A7 B5 78 F6"),
+            "D2 5D 86 42 A7 B5 78 F6",
+        )
+
+    def test_arrow_prefix_and_paren_suffix_stripped(self):
+        self.assertEqual(
+            extract_hex_only("RX <- 56 8F B5 BF 7E 47 0B 2C (1 мс.)"),
+            "56 8F B5 BF 7E 47 0B 2C",
+        )
+
+    def test_comma_separated_merged(self):
+        self.assertEqual(
+            extract_hex_only("83 40 8A 5F, 83 40 8A 5F"),
+            "83 40 8A 5F 83 40 8A 5F",
+        )
+
+    def test_brackets_stripped(self):
+        self.assertEqual(extract_hex_only("[A1 B2 C3 D4]"), "A1 B2 C3 D4")
+
+    def test_pipe_separated_merged(self):
+        self.assertEqual(
+            extract_hex_only("A1 B2 C3 D4 | E5 F6 A7 B8"),
+            "A1 B2 C3 D4 E5 F6 A7 B8",
+        )
+
+
+class TestProcessContentStripped(unittest.TestCase):
+    """Tests for process_content() with strip_extra=True."""
+
+    def test_multiline_stripped(self):
+        inp = (
+            "01 Key 3B: F8 BB 1E BE AE D7 E9 A8 Current\n"
+            "AE D7 E9 A8\n"
+            "\n"
+            "Some comment"
+        )
+        # "01" and "3B" are valid hex tokens from the prefix — kept after stripping
+        expected = (
+            "01 3B BE 1E BB F8 A8 E9 D7 AE\n"
+            "A8 E9 D7 AE\n"
+            "\n"
+            ""
+        )
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
+
+    def test_comma_separated_stripped(self):
+        inp = "83 40 8A 5F, 83 40 8A 5F"
+        expected = "5F 8A 40 83 5F 8A 40 83"
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
 
 
 if __name__ == "__main__":
