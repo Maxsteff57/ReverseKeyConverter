@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Compiled executable (rebuild with build.bat)
+*.exe
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Claude workspace
+.claude/
+
+# Logs
+build.log
+
+# Temp
+%TEMP%/
