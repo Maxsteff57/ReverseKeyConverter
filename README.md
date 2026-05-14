@@ -4,6 +4,10 @@ GUI-приложение для конвертации hex-ключей путё
 
 Поддерживает любые форматы входных данных: с префиксами, суффиксами, через запятую, скобки, pipe — лишний текст распознаётся и игнорируется автоматически.
 
+## Скачать
+
+[![Download](https://img.shields.io/badge/Download-ReverseHexConverter.exe-blue?style=for-the-badge&logo=windows)](https://github.com/Maxsteff57/ReverseHexConverter/releases/latest)
+
 ## Возможности
 
 - Конвертация в реальном времени с двумя панелями
@@ -13,21 +17,14 @@ GUI-приложение для конвертации hex-ключей путё
 - Журнал ошибок с временными метками
 - Горячие клавиши: `Ctrl+V` `Ctrl+S` `Ctrl+O` `Ctrl+D` `Ctrl+L`
 - Drag & Drop загрузка файлов
-- Автозамена `Reverse` → `True` при вставке
 
 ## Поддерживаемые форматы
 
 ```
-01 Key 3B: F8 BB 1E BE ... Current
 F8 BB 1E BE ...
 07_56    D2 5D 86 42 ...
-RX <- 56 8F B5 BF ... (1 мс.)
 83 40 8A 5F, 83 40 8A 5F
 ```
-
-## Скачать
-
-[![Download](https://img.shields.io/badge/Download-ReverseHexConverter.exe-blue?style=for-the-badge&logo=windows)](https://github.com/Maxsteff57/ReverseHexConverter/releases/latest)
 
 ## Требования
 
