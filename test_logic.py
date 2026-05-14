@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Unit tests for Reverse Key Converter transformation and validation logic.
+Unit tests for Reverse Hex Converter transformation and validation logic.
 
 Run:  py -m unittest test_logic -v
 """
@@ -10,7 +10,7 @@ import sys
 import unittest
 
 sys.path.insert(0, '.')
-from reverse_key_converter import transform_line, is_line_valid, process_content, extract_hex_only
+from reverse_hex_converter import transform_line, is_line_valid, process_content, extract_hex_only
 
 
 class TestTransformLine(unittest.TestCase):
@@ -229,7 +229,9 @@ class TestProcessContent(unittest.TestCase):
 
 
 class TestExtractHexOnly(unittest.TestCase):
-    """Tests for extract_hex_only(): stripping non-hex text."""
+    """Tests for extract_hex_only(): stripping non-hex text.
+    Only significant hex runs (≥4 bytes) are kept; short stray tokens
+    like '01', '3B' from labels are discarded."""
 
     def test_empty_line(self):
         self.assertEqual(extract_hex_only(""), "")
@@ -240,17 +242,36 @@ class TestExtractHexOnly(unittest.TestCase):
     def test_no_hex(self):
         self.assertEqual(extract_hex_only("Some random text"), "")
 
-    def test_plain_hex(self):
+    def test_plain_hex_8_bytes(self):
         self.assertEqual(
             extract_hex_only("F8 BB 1E BE AE D7 E9 A8"),
             "F8 BB 1E BE AE D7 E9 A8",
         )
 
+    def test_plain_hex_4_bytes(self):
+        self.assertEqual(extract_hex_only("AE D7 E9 A8"), "AE D7 E9 A8")
+
+    def test_short_hex_3_bytes_discarded(self):
+        """Runs with < 4 bytes are discarded as label fragments."""
+        self.assertEqual(extract_hex_only("AE D7 E9"), "")
+
     def test_prefix_colon_stripped(self):
-        # "01" and "3B" are valid hex tokens — they are kept
+        """'01' and '3B' from '01 Key 3B:' are short stray tokens — discarded."""
         self.assertEqual(
-            extract_hex_only("01 Key 3B: F8 BB 1E BE Current"),
-            "01 3B F8 BB 1E BE",
+            extract_hex_only("01 Key 3B: F8 BB 1E BE AE D7 E9 A8 Current"),
+            "F8 BB 1E BE AE D7 E9 A8",
+        )
+
+    def test_prefix_colon_32_bytes(self):
+        self.assertEqual(
+            extract_hex_only(
+                "01 Key 3B: F8 BB 1E BE AE D7 E9 A8 61 AC F1 C0 "
+                "21 6B BD 6F 92 C2 F2 C0 62 FC 95 CF BB 79 22 A1 "
+                "31 5F DA B6 Current"
+            ),
+            "F8 BB 1E BE AE D7 E9 A8 61 AC F1 C0 "
+            "21 6B BD 6F 92 C2 F2 C0 62 FC 95 CF BB 79 22 A1 "
+            "31 5F DA B6",
         )
 
     def test_underscore_prefix_stripped(self):
@@ -280,9 +301,29 @@ class TestExtractHexOnly(unittest.TestCase):
             "A1 B2 C3 D4 E5 F6 A7 B8",
         )
 
+    def test_header_line_no_hex(self):
+        """Decorative header lines produce empty string."""
+        self.assertEqual(
+            extract_hex_only("============================================ True Key ============================================"),
+            "",
+        )
+
 
 class TestProcessContentStripped(unittest.TestCase):
-    """Tests for process_content() with strip_extra=True."""
+    """Tests for process_content() with strip_extra=True.
+    Strip happens FIRST (remove non-hex), then transform (reverse groups)."""
+
+    def test_key_3B_01_stripped(self):
+        """Full 32-byte line: prefix '01 Key 3B:' and 'Current' are removed,
+        then the clean hex is reversed in groups of 4."""
+        inp = "01 Key 3B: F8 BB 1E BE AE D7 E9 A8 61 AC F1 C0 21 6B BD 6F 92 C2 F2 C0 62 FC 95 CF BB 79 22 A1 31 5F DA B6 Current"
+        expected = "BE 1E BB F8 A8 E9 D7 AE C0 F1 AC 61 6F BD 6B 21 C0 F2 C2 92 CF 95 FC 62 A1 22 79 BB B6 DA 5F 31"
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
+
+    def test_key_56_06_stripped(self):
+        inp = "06 Key 56: F2 E7 6A 63 21 AD AE 54 0B 06 D7 F4 71 4D E2 DA 48 5B EE 52 51 22 83 EA 91 C7 9D 83 40 8A 5F 47 Next"
+        expected = "63 6A E7 F2 54 AE AD 21 F4 D7 06 0B DA E2 4D 71 52 EE 5B 48 EA 83 22 51 83 9D C7 91 47 5F 8A 40"
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
 
     def test_multiline_stripped(self):
         inp = (
@@ -291,9 +332,8 @@ class TestProcessContentStripped(unittest.TestCase):
             "\n"
             "Some comment"
         )
-        # "01" and "3B" are valid hex tokens from the prefix — kept after stripping
         expected = (
-            "01 3B BE 1E BB F8 A8 E9 D7 AE\n"
+            "BE 1E BB F8 A8 E9 D7 AE\n"
             "A8 E9 D7 AE\n"
             "\n"
             ""
@@ -303,6 +343,35 @@ class TestProcessContentStripped(unittest.TestCase):
     def test_comma_separated_stripped(self):
         inp = "83 40 8A 5F, 83 40 8A 5F"
         expected = "5F 8A 40 83 5F 8A 40 83"
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
+
+    def test_underscore_prefix_stripped(self):
+        inp = "07_56    D2 5D 86 42 A7 B5 78 F6"
+        expected = "42 86 5D D2 F6 78 B5 A7"
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
+
+    def test_arrow_prefix_stripped(self):
+        inp = "RX <- 56 8F B5 BF 7E 47 0B 2C 55 A6 15 47 (1 мс.)"
+        expected = "BF B5 8F 56 2C 0B 47 7E 47 15 A6 55"
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
+
+    def test_header_lines_become_empty(self):
+        inp = (
+            "============================================ True Key ============================================\n"
+            "\n"
+            "01 Key 3B: F8 BB 1E BE AE D7 E9 A8 Current"
+        )
+        expected = (
+            "\n"
+            "\n"
+            "BE 1E BB F8 A8 E9 D7 AE"
+        )
+        self.assertEqual(process_content(inp, strip_extra=True), expected)
+
+    def test_plain_hex_no_change(self):
+        """Already clean hex — strip has no effect."""
+        inp = "F8 BB 1E BE AE D7 E9 A8"
+        expected = "BE 1E BB F8 A8 E9 D7 AE"
         self.assertEqual(process_content(inp, strip_extra=True), expected)
 
 

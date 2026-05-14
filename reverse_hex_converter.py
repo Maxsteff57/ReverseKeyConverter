@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Reverse Key Converter
+Reverse Hex Converter
 Converts reverse keys to true keys by swapping every group of 4 bytes.
 """
 
@@ -52,27 +52,31 @@ def transform_line(line):
 
 def extract_hex_only(line):
     """
-    Return only the hex-byte runs from *line*, stripping all non-hex text
-    (prefixes, suffixes, separators).  Runs are joined with a single space.
-    If the line has no hex content, return an empty string.
+    Return only the *significant* hex-byte runs from *line* (runs with ≥ 4
+    bytes), stripping all non-hex text (prefixes like "01 Key 3B:",
+    suffixes like "Current", separators).  Short stray hex tokens that are
+    part of labels (e.g. "01", "3B") are discarded.
+    Runs are joined with a single space.
     """
     stripped = line.strip()
     if not stripped:
         return ''
     runs = _HEX_RUN_RE.findall(stripped)
-    return ' '.join(runs) if runs else ''
+    # Keep only runs with ≥ 4 bytes — short ones are label fragments
+    significant = [r for r in runs if len(r.split()) >= 4]
+    return ' '.join(significant) if significant else ''
 
 
 def process_content(text, strip_extra=False):
     """Process multi-line text and return transformed text.
-    If *strip_extra* is True, remove everything except hex-byte chains.
+    If *strip_extra* is True, strip non-hex text FIRST, then transform.
     """
     lines = text.splitlines()
     result = []
     for line in lines:
-        converted = transform_line(line)
         if strip_extra:
-            converted = extract_hex_only(converted)
+            line = extract_hex_only(line)
+        converted = transform_line(line)
         result.append(converted)
     return '\n'.join(result)
 
@@ -102,10 +106,10 @@ def is_line_valid(line):
     return all(len(run.split()) % 4 == 0 for run in significant)
 
 
-class ReverseKeyConverterApp:
+class ReverseHexConverterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Reverse Key Converter")
+        self.root.title("Reverse Hex Converter")
         self.root.geometry("1000x750")
         self.root.minsize(900, 650)
 
@@ -469,7 +473,7 @@ def main():
     else:
         root = tk.Tk()
 
-    app = ReverseKeyConverterApp(root)
+    app = ReverseHexConverterApp(root)
     root.mainloop()
 
 
